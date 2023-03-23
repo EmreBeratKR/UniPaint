@@ -22,7 +22,7 @@ namespace UniPaint
             InitializeTexture();
             SelectDefaultPosition();
         }
-
+        
 
         public void OnPointerDown(PointerEventData eventData)
         {
@@ -57,9 +57,23 @@ namespace UniPaint
             return m_Saturation;
         }
 
+        public void SetSaturation(float saturation)
+        {
+            m_Saturation = saturation;
+            var localPosition = SVToLocalPosition(m_Saturation, m_Value);
+            SelectPosition(GetImagePosition() + localPosition);
+        }
+
         public float GetValue()
         {
             return m_Value;
+        }
+
+        public void SetValue(float value)
+        {
+            m_Value = value;
+            var localPosition = SVToLocalPosition(m_Saturation, m_Value);
+            SelectPosition(GetImagePosition() + localPosition);
         }
         
 
@@ -96,6 +110,14 @@ namespace UniPaint
             selector.color = m_Saturation > 0.5f || m_Value < 0.5f
                 ? Color.white
                 : Color.black;
+        }
+
+        private Vector2 SVToLocalPosition(float s, float v)
+        {
+            var imageHalfSize = GetImageSize() * 0.5f;
+            var x = Mathf.Lerp(-imageHalfSize.x, imageHalfSize.x, s);
+            var y = Mathf.Lerp(-imageHalfSize.y, imageHalfSize.y, v);
+            return new Vector2(x, y);
         }
 
         private Vector2 GetImagePosition()

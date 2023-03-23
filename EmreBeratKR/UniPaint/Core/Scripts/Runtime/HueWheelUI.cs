@@ -51,6 +51,12 @@ namespace UniPaint
             return m_Hue;
         }
 
+        public void SetHue(float hue)
+        {
+            var localPosition = HueToLocalPosition(hue);
+            SelectLocalPosition(localPosition);
+        }
+
 
         private void SelectDefaultPosition()
         {
@@ -91,6 +97,11 @@ namespace UniPaint
         private void SelectPosition(Vector2 position)
         {
             var localPosition = ScreenPointToLocalPosition(position);
+            SelectLocalPosition(localPosition);
+        }
+
+        private void SelectLocalPosition(Vector2 localPosition)
+        {
             var localPositionNormalized = localPosition.normalized;
             var distance = GetImageSize() * 0.5f - GetSelectorSize() * 0.5f;
             selector.rectTransform.position = GetImagePosition() + localPositionNormalized * distance;
@@ -98,6 +109,14 @@ namespace UniPaint
             svRect.SetHue(m_Hue);
         }
 
+        private Vector2 HueToLocalPosition(float hue)
+        {
+            var angleInRadians = Mathf.Lerp(Mathf.PI, -Mathf.PI, hue);
+            var x = Mathf.Cos(angleInRadians);
+            var y = Mathf.Sin(angleInRadians);
+            return new Vector2(-x, y);
+        }
+        
         private float LocalPositionToHue(Vector2 localPosition)
         {
             var angleInRadians = Mathf.Atan2(localPosition.y, -localPosition.x);

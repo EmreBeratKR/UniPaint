@@ -1,6 +1,6 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 namespace UniPaint
 {
@@ -9,6 +9,9 @@ namespace UniPaint
     public class UniPaintCanvas : MonoBehaviour
     {
         private static readonly int MainTexID = Shader.PropertyToID("_MainTex");
+
+
+        public event Action<float, float, float, float> OnColorPicked; 
 
 
         private delegate void ToolMethod(Vector2 position);
@@ -36,6 +39,7 @@ namespace UniPaint
         private int m_Height;
         private bool m_IsDirty;
         private bool m_IsDragging;
+        private bool m_IsClickOnlyTool;
 
 
         private void Awake()
@@ -52,7 +56,7 @@ namespace UniPaint
 
         private void Update()
         {
-            HandleDrag();
+            HandleInput();
             HandleTool();
             TryApplyChanges();
         }
@@ -85,22 +89,32 @@ namespace UniPaint
 
         public void SetToolCirclePen()
         {
+            m_IsClickOnlyTool = false;
             m_SelectedTool = CircleDrawTool;
         }
         
         public void SetToolCircleEraser()
         {
+            m_IsClickOnlyTool = false;
             m_SelectedTool = CircleEraseTool;
         }
         
         public void SetToolSquarePen()
         {
+            m_IsClickOnlyTool = false;
             m_SelectedTool = SquareDrawTool;
         }
         
         public void SetToolSquareEraser()
         {
+            m_IsClickOnlyTool = false;
             m_SelectedTool = SquareEraseTool;
+        }
+
+        public void SetToolColorPicker()
+        {
+            m_IsClickOnlyTool = true;
+            m_SelectedTool = ColorPickerTool;
         }
         
 
@@ -197,18 +211,26 @@ namespace UniPaint
             m_CanvasTexture.Apply(false);
         }
 
-        private void HandleDrag()
+        private void HandleInput()
         {
             if (Input.GetMouseButtonDown(0))
             {
                 if (!EventSystem.current.IsPointerOverGameObject())
                 {
+                    if (m_IsClickOnlyTool)
+                    {
+                        var position = MousePositionToCanvasPosition(Input.mousePosition);
+                        m_SelectedTool(position);
+                        return;
+                    }
+                    
                     m_IsDragging = true;
                     m_PreviousFrameMousePosition = Input.mousePosition;
+                    return;
                 }
             }
             
-            else if (Input.GetMouseButtonUp(0))
+            if (Input.GetMouseButtonUp(0))
             {
                 m_IsDragging = false;
             }
@@ -216,6 +238,8 @@ namespace UniPaint
         
         private void HandleTool()
         {
+            if (m_IsClickOnlyTool) return;
+            
             if (!m_IsDragging) return;
             
             if (!Input.GetMouseButton(0)) return;
@@ -291,6 +315,15 @@ namespace UniPaint
             }
             
             SetDirty();
+        }
+
+        private void ColorPickerTool(Vector2 position)
+        {
+            var x = Mathf.FloorToInt(position.x);
+            var y = Mathf.FloorToInt(position.y);
+            var color = m_TextureColors[GetPixelIndex(x, y)];
+            Color.RGBToHSV(color, out var h, out var s, out var v);
+            OnColorPicked?.Invoke(h, s, v, color.a);
         }
 
         private void SquareDrawTool(Vector2 position)

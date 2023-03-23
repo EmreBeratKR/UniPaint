@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -14,7 +15,7 @@ namespace UniPaint
         public event Action<float, float, float, float> OnColorPicked; 
 
 
-        private delegate void ToolMethod(Vector2 position);
+        private delegate void ToolMethod(Vector2Int position);
         
         
         [SerializeField, Min(1f)] private Vector2Int resolution = new Vector2Int(256, 256);
@@ -24,6 +25,10 @@ namespace UniPaint
         [SerializeField, Range(0f, 1f)] private float defaultToolSize = 0.2f;
 
 
+        private readonly HashSet<int> m_FloodFillBuffer = new HashSet<int>();
+        
+        
+        private Color m_FloodFillStartColor;
         private Color[] m_TextureColors;
         private Vector3 m_PreviousFrameMousePosition;
         private ColorWheelUI m_ColorWheel;
@@ -116,6 +121,12 @@ namespace UniPaint
             m_IsClickOnlyTool = true;
             m_SelectedTool = ColorPickerTool;
         }
+
+        public void SetToolColorBucket()
+        {
+            m_IsClickOnlyTool = true;
+            m_SelectedTool = ColorBucketTool;
+        }
         
 
         private bool TryApplyChanges()
@@ -165,7 +176,8 @@ namespace UniPaint
         
         private void InitializeTexture()
         {
-            m_TextureColors = new Color[GetPixelCount()];
+            var pixelCount = GetPixelCount();
+            m_TextureColors = new Color[pixelCount];
             m_CanvasTexture = new Texture2D(m_Width, m_Height, TextureFormat.ARGB32, false)
             {
                 filterMode = FilterMode.Point
@@ -220,7 +232,7 @@ namespace UniPaint
                     if (m_IsClickOnlyTool)
                     {
                         var position = MousePositionToCanvasPosition(Input.mousePosition);
-                        m_SelectedTool(position);
+                        m_SelectedTool(FloorToInt(position));
                         return;
                     }
                     
@@ -252,26 +264,23 @@ namespace UniPaint
                 var t = Mathf.InverseLerp(0, deltaDistance, i);
                 var lerpPosition = Vector3.Lerp(mousePosition, m_PreviousFrameMousePosition, t);
                 var position = MousePositionToCanvasPosition(lerpPosition);
-                m_SelectedTool(position);
+                m_SelectedTool(FloorToInt(position));
             }
             
             m_PreviousFrameMousePosition = mousePosition;
         }
 
-        private void SquareColorTool(Vector2 position, Color color)
+        private void SquareColorTool(Vector2Int position, Color color)
         {
-            var posX = Mathf.FloorToInt(position.x);
-            var posY = Mathf.FloorToInt(position.y);
+            if (position.x < 0 || position.x >= m_Width) return;
             
-            if (posX < 0 || posX >= m_Width) return;
-            
-            if (posY < 0 || posY >= m_Height) return;
+            if (position.y < 0 || position.y >= m_Height) return;
             
             var radiusInt = Mathf.CeilToInt(m_ToolSize);
-            var left = Mathf.Max(0, posX - radiusInt);
-            var right = Mathf.Min(m_Width, posX + radiusInt + 1);
-            var bottom = Mathf.Max(0, posY - radiusInt);
-            var top = Mathf.Min(m_Height, posY + radiusInt + 1);
+            var left = Mathf.Max(0, position.x - radiusInt);
+            var right = Mathf.Min(m_Width, position.x + radiusInt + 1);
+            var bottom = Mathf.Max(0, position.y - radiusInt);
+            var top = Mathf.Min(m_Height, position.y + radiusInt + 1);
             
             for (int x = left; x < right; x++)
             {
@@ -284,20 +293,17 @@ namespace UniPaint
             SetDirty();
         }
 
-        private void CircleColorTool(Vector2 position, Color color)
+        private void CircleColorTool(Vector2Int position, Color color)
         {
-            var posX = Mathf.FloorToInt(position.x);
-            var posY = Mathf.FloorToInt(position.y);
+            if (position.x < 0 || position.x >= m_Width) return;
             
-            if (posX < 0 || posX >= m_Width) return;
-            
-            if (posY < 0 || posY >= m_Height) return;
+            if (position.y < 0 || position.y >= m_Height) return;
             
             var radiusInt = Mathf.CeilToInt(m_ToolSize);
-            var left = Mathf.Max(0, posX - radiusInt);
-            var right = Mathf.Min(m_Width, posX + radiusInt + 1);
-            var bottom = Mathf.Max(0, posY - radiusInt);
-            var top = Mathf.Min(m_Height, posY + radiusInt + 1);
+            var left = Mathf.Max(0, position.x - radiusInt);
+            var right = Mathf.Min(m_Width, position.x + radiusInt + 1);
+            var bottom = Mathf.Max(0, position.y - radiusInt);
+            var top = Mathf.Min(m_Height, position.y + radiusInt + 1);
             var sqrPenSize = m_ToolSize * m_ToolSize;
             
             for (int x = left; x < right; x++)
@@ -317,31 +323,44 @@ namespace UniPaint
             SetDirty();
         }
 
-        private void ColorPickerTool(Vector2 position)
+        private void ColorPickerTool(Vector2Int position)
         {
-            var x = Mathf.FloorToInt(position.x);
-            var y = Mathf.FloorToInt(position.y);
-            var color = m_TextureColors[GetPixelIndex(x, y)];
+            var color = m_TextureColors[GetPixelIndex(position.x, position.y)];
             Color.RGBToHSV(color, out var h, out var s, out var v);
             OnColorPicked?.Invoke(h, s, v, color.a);
         }
 
-        private void SquareDrawTool(Vector2 position)
+        private void ColorBucketTool(Vector2Int position)
+        {
+            m_FloodFillBuffer.Clear();
+            m_FloodFillStartColor = m_TextureColors[GetPixelIndex(position.x, position.y)];
+            FloodFill(position.x, position.y);
+
+            var color = GetSelectedColor();
+            foreach (var pixelIndex in m_FloodFillBuffer)
+            {
+                SetPixelColorAtIndex(pixelIndex, color);
+            }
+            
+            SetDirty();
+        }
+
+        private void SquareDrawTool(Vector2Int position)
         {
             SquareColorTool(position, GetSelectedColor());
         }
         
-        private void CircleDrawTool(Vector2 position)
+        private void CircleDrawTool(Vector2Int position)
         {
             CircleColorTool(position, GetSelectedColor());
         }
 
-        private void SquareEraseTool(Vector2 position)
+        private void SquareEraseTool(Vector2Int position)
         {
             SquareColorTool(position, Color.clear);
         }
 
-        private void CircleEraseTool(Vector2 position)
+        private void CircleEraseTool(Vector2Int position)
         {
             CircleColorTool(position, Color.clear);
         }
@@ -383,13 +402,72 @@ namespace UniPaint
         {
             m_TextureColors[index] = color;
         }
-        
+
+        private void FloodFill(int x, int y)
+        {
+            var index = GetPixelIndex(x, y);
+
+            if (m_FloodFillBuffer.Contains(index)) return;
+            
+            var color = m_TextureColors[index];
+            
+            if (!EqualColors(m_FloodFillStartColor, color)) return;
+            
+            m_FloodFillBuffer.Add(index);
+
+            var right = x + 1;
+            if (right < m_Width)
+            {
+                FloodFill(right, y);
+            }
+
+            var left = x - 1;
+            if (left >= 0)
+            {
+                FloodFill(left, y);
+            }
+
+            var top = y + 1;
+            if (top < m_Height)
+            {
+                FloodFill(x, top);
+            }
+
+            var bottom = y - 1;
+            if (bottom >= 0)
+            {
+                FloodFill(x, bottom);
+            }
+        }
+
+
+        private static bool EqualColors(Color lhs, Color rhs)
+        {
+            const float tolerance = 0.0001f;
+            
+            if (Math.Abs(lhs.r - rhs.r) > tolerance) return false;
+            
+            if (Math.Abs(lhs.g - rhs.g) > tolerance) return false;
+            
+            if (Math.Abs(lhs.b - rhs.b) > tolerance) return false;
+            
+            if (Math.Abs(lhs.a - rhs.a) > tolerance) return false;
+
+            return true;
+        }
         
         private static float InverseLerpUnclamped(float a, float b, float value)
         {
             return (double) a != (double) b 
                 ? (float) (((double) value - (double) a) / ((double) b - (double) a)) 
                 : 0.0f;
+        }
+
+        private static Vector2Int FloorToInt(Vector2 vector)
+        {
+            var x = Mathf.RoundToInt(vector.x);
+            var y = Mathf.RoundToInt(vector.y);
+            return new Vector2Int(x, y);
         }
         
         private static Material GetDefaultMaterial()

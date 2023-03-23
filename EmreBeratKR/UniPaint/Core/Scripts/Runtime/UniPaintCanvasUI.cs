@@ -12,6 +12,7 @@ namespace UniPaint
         [SerializeField] private Button squareEraseButton;
         [SerializeField] private Button clearButton;
         [SerializeField] private Button colorPickerButton;
+        [SerializeField] private Button colorBucketButton;
         [SerializeField] private Slider toolSizeSlider;
 
 
@@ -57,6 +58,11 @@ namespace UniPaint
             if (colorPickerButton)
             {
                 colorPickerButton.onClick.AddListener(m_Canvas.SetToolColorPicker);
+            }
+
+            if (colorBucketButton)
+            {
+                colorBucketButton.onClick.AddListener(m_Canvas.SetToolColorBucket);
             }
             
             if (toolSizeSlider)

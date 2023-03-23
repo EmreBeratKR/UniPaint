@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace UniPaint
 {
@@ -10,14 +11,14 @@ namespace UniPaint
 
 
         private delegate void ToolMethod(Vector2 position);
-        
+
         
         [SerializeField, Min(1f)] private Vector2Int resolution = new Vector2Int(256, 256);
         [SerializeField, Min(0f)] private float size = 5f;
         [SerializeField, Min(0f)] private float penSize = 10f;
-        [SerializeField] private Color selectedColor = Color.white;
 
 
+        private ColorWheelUI m_ColorWheel;
         private ToolMethod m_SelectedTool;
         private Texture2D m_CanvasTexture;
         private Material m_CanvasMaterial;
@@ -26,11 +27,13 @@ namespace UniPaint
         private Mesh m_CanvasMesh;
         private Camera m_Camera;
         private bool m_IsDirty;
+        private bool m_IsDragging;
 
 
         private void Awake()
         {
             m_Camera = Camera.main;
+            m_ColorWheel = FindObjectOfType<ColorWheelUI>();
             InitializeMeshRenderer();
             InitializeMesh();
             InitializeTexture();
@@ -39,6 +42,7 @@ namespace UniPaint
 
         private void Update()
         {
+            HandleDrag();
             HandleTool();
             TryApplyChanges();
         }
@@ -137,8 +141,26 @@ namespace UniPaint
             m_CanvasTexture.Apply();
         }
 
+        private void HandleDrag()
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (!EventSystem.current.IsPointerOverGameObject())
+                {
+                    m_IsDragging = true;
+                }
+            }
+            
+            else if (Input.GetMouseButtonUp(0))
+            {
+                m_IsDragging = false;
+            }
+        }
+        
         private void HandleTool()
         {
+            if (!m_IsDragging) return;
+            
             if (!Input.GetMouseButton(0)) return;
 
             var position = MousePositionToCanvasPosition(Input.mousePosition);
@@ -204,12 +226,12 @@ namespace UniPaint
 
         private void SquareDrawTool(Vector2 position)
         {
-            SquareColorTool(position, selectedColor);
+            SquareColorTool(position, GetSelectedColor());
         }
         
         private void CircleDrawTool(Vector2 position)
         {
-            CircleColorTool(position, selectedColor);
+            CircleColorTool(position, GetSelectedColor());
         }
 
         private void SquareEraseTool(Vector2 position)
@@ -232,6 +254,11 @@ namespace UniPaint
             var tX = InverseLerpUnclamped(0f, totalSize.x, worldPosition.x);
             var tY = InverseLerpUnclamped(0f, totalSize.y, worldPosition.y);
             return new Vector2(tX * resolution.x, tY * resolution.y);
+        }
+
+        private Color GetSelectedColor()
+        {
+            return m_ColorWheel.GetColor();
         }
 
 

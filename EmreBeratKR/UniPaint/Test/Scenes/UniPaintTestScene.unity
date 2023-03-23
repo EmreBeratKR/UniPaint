@@ -405,9 +405,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6f55c901e444765a28e9f04fe137517, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: {x: 1920, y: 1080}
+  resolution: {x: 960, y: 540}
   size: 5
-  penSize: 10
+  penSize: 5
 --- !u!23 &713758461
 MeshRenderer:
   m_ObjectHideFlags: 0

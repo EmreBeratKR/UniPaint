@@ -17,7 +17,9 @@ namespace UniPaint
         [SerializeField, Min(0f)] private float size = 5f;
         [SerializeField, Min(0f)] private float penSize = 10f;
 
-
+        
+        private Color[] m_TextureColors;
+        private Vector3 m_PreviousFrameMousePosition;
         private ColorWheelUI m_ColorWheel;
         private ToolMethod m_SelectedTool;
         private Texture2D m_CanvasTexture;
@@ -26,12 +28,16 @@ namespace UniPaint
         private MeshFilter m_MeshFilter;
         private Mesh m_CanvasMesh;
         private Camera m_Camera;
+        private int m_Width;
+        private int m_Height;
         private bool m_IsDirty;
         private bool m_IsDragging;
 
 
         private void Awake()
         {
+            m_Width = resolution.x;
+            m_Height = resolution.y;
             m_Camera = Camera.main;
             m_ColorWheel = FindObjectOfType<ColorWheelUI>();
             InitializeMeshRenderer();
@@ -95,19 +101,18 @@ namespace UniPaint
         
         private void InitializeTexture()
         {
-            m_CanvasTexture = new Texture2D(resolution.x, resolution.y, TextureFormat.ARGB32, false)
+            m_TextureColors = new Color[GetPixelCount()];
+            m_CanvasTexture = new Texture2D(m_Width, m_Height, TextureFormat.ARGB32, false)
             {
                 filterMode = FilterMode.Point
             };
             m_CanvasMaterial.SetTexture(MainTexID, m_CanvasTexture);
 
-            var center = new Vector2(resolution.x, resolution.y) * 0.5f;
-            
-            for (int x = 0; x < resolution.x; x++)
+            for (int x = 0; x < m_Width; x++)
             {
-                for (int y = 0; y < resolution.y; y++)
+                for (int y = 0; y < m_Height; y++)
                 {
-                    m_CanvasTexture.SetPixel(x, y, Color.clear);
+                    SetPixelColor(x, y, Color.clear);
                 }
             }
             
@@ -116,7 +121,7 @@ namespace UniPaint
         
         private float GetAspectRatio()
         {
-            return (float) resolution.x / resolution.y;
+            return (float) m_Width / m_Height;
         }
 
         private Vector2 GetTotalSize()
@@ -138,7 +143,8 @@ namespace UniPaint
         
         private void ApplyChanges()
         {
-            m_CanvasTexture.Apply();
+            m_CanvasTexture.SetPixels(m_TextureColors);
+            m_CanvasTexture.Apply(false);
         }
 
         private void HandleDrag()
@@ -148,6 +154,7 @@ namespace UniPaint
                 if (!EventSystem.current.IsPointerOverGameObject())
                 {
                     m_IsDragging = true;
+                    m_PreviousFrameMousePosition = Input.mousePosition;
                 }
             }
             
@@ -163,8 +170,18 @@ namespace UniPaint
             
             if (!Input.GetMouseButton(0)) return;
 
-            var position = MousePositionToCanvasPosition(Input.mousePosition);
-            m_SelectedTool(position);
+            var mousePosition = Input.mousePosition;
+            var deltaDistance = (mousePosition - m_PreviousFrameMousePosition).magnitude;
+
+            for (var i = 0f; i <= deltaDistance; i += penSize * 1f)
+            {
+                var t = Mathf.InverseLerp(0, deltaDistance, i);
+                var lerpPosition = Vector3.Lerp(mousePosition, m_PreviousFrameMousePosition, t);
+                var position = MousePositionToCanvasPosition(lerpPosition);
+                m_SelectedTool(position);
+            }
+            
+            m_PreviousFrameMousePosition = mousePosition;
         }
 
         private void SquareColorTool(Vector2 position, Color color)
@@ -172,21 +189,21 @@ namespace UniPaint
             var posX = Mathf.FloorToInt(position.x);
             var posY = Mathf.FloorToInt(position.y);
             
-            if (posX < 0 || posX >= resolution.x) return;
+            if (posX < 0 || posX >= m_Width) return;
             
-            if (posY < 0 || posY >= resolution.y) return;
+            if (posY < 0 || posY >= m_Height) return;
             
             var radiusInt = Mathf.CeilToInt(penSize);
             var left = Mathf.Max(0, posX - radiusInt);
-            var right = Mathf.Min(resolution.x, posX + radiusInt + 1);
+            var right = Mathf.Min(m_Width, posX + radiusInt + 1);
             var bottom = Mathf.Max(0, posY - radiusInt);
-            var top = Mathf.Min(resolution.y, posY + radiusInt + 1);
+            var top = Mathf.Min(m_Height, posY + radiusInt + 1);
             
             for (int x = left; x < right; x++)
             {
                 for (int y = bottom; y < top; y++)
                 {
-                    m_CanvasTexture.SetPixel(x, y, color);
+                    SetPixelColor(x, y, color);
                 }
             }
             
@@ -198,26 +215,28 @@ namespace UniPaint
             var posX = Mathf.FloorToInt(position.x);
             var posY = Mathf.FloorToInt(position.y);
             
-            if (posX < 0 || posX >= resolution.x) return;
+            if (posX < 0 || posX >= m_Width) return;
             
-            if (posY < 0 || posY >= resolution.y) return;
+            if (posY < 0 || posY >= m_Height) return;
             
             var radiusInt = Mathf.CeilToInt(penSize);
             var left = Mathf.Max(0, posX - radiusInt);
-            var right = Mathf.Min(resolution.x, posX + radiusInt + 1);
+            var right = Mathf.Min(m_Width, posX + radiusInt + 1);
             var bottom = Mathf.Max(0, posY - radiusInt);
-            var top = Mathf.Min(resolution.y, posY + radiusInt + 1);
+            var top = Mathf.Min(m_Height, posY + radiusInt + 1);
             var sqrPenSize = penSize * penSize;
             
             for (int x = left; x < right; x++)
             {
                 for (int y = bottom; y < top; y++)
                 {
-                    var sqrDistance = Vector2.SqrMagnitude(position - new Vector2(x, y));
+                    var deltaX = position.x - x;
+                    var deltaY = position.y - y;
+                    var sqrDistance = deltaX * deltaX + deltaY * deltaY;
                     
                     if (sqrDistance > sqrPenSize) continue;
                     
-                    m_CanvasTexture.SetPixel(x, y, color);
+                    SetPixelColor(x, y, color);
                 }
             }
             
@@ -253,7 +272,7 @@ namespace UniPaint
             var worldPosition = mouseWorldPosition - leftBottomPosition;
             var tX = InverseLerpUnclamped(0f, totalSize.x, worldPosition.x);
             var tY = InverseLerpUnclamped(0f, totalSize.y, worldPosition.y);
-            return new Vector2(tX * resolution.x, tY * resolution.y);
+            return new Vector2(tX * m_Width, tY * m_Height);
         }
 
         private Color GetSelectedColor()
@@ -261,7 +280,23 @@ namespace UniPaint
             return m_ColorWheel.GetColor();
         }
 
+        private int GetPixelCount()
+        {
+            return m_Width * m_Height;
+        }
+        
+        private int GetPixelIndex(int x, int y)
+        {
+            return x + y * m_Width;
+        }
 
+        private void SetPixelColor(int x, int y, Color color)
+        {
+            var index = GetPixelIndex(x, y);
+            m_TextureColors[index] = color;
+        }
+        
+        
         private static float InverseLerpUnclamped(float a, float b, float value)
         {
             return (double) a != (double) b 

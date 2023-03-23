@@ -91,7 +91,10 @@ namespace UniPaint
         
         private void InitializeTexture()
         {
-            m_CanvasTexture = new Texture2D(resolution.x, resolution.y, TextureFormat.ARGB32, false);
+            m_CanvasTexture = new Texture2D(resolution.x, resolution.y, TextureFormat.ARGB32, false)
+            {
+                filterMode = FilterMode.Point
+            };
             m_CanvasMaterial.SetTexture(MainTexID, m_CanvasTexture);
 
             var center = new Vector2(resolution.x, resolution.y) * 0.5f;
@@ -146,6 +149,11 @@ namespace UniPaint
         {
             var posX = Mathf.FloorToInt(position.x);
             var posY = Mathf.FloorToInt(position.y);
+            
+            if (posX < 0 || posX >= resolution.x) return;
+            
+            if (posY < 0 || posY >= resolution.y) return;
+            
             var radiusInt = Mathf.CeilToInt(penSize);
             var left = Mathf.Max(0, posX - radiusInt);
             var right = Mathf.Min(resolution.x, posX + radiusInt + 1);
@@ -167,6 +175,11 @@ namespace UniPaint
         {
             var posX = Mathf.FloorToInt(position.x);
             var posY = Mathf.FloorToInt(position.y);
+            
+            if (posX < 0 || posX >= resolution.x) return;
+            
+            if (posY < 0 || posY >= resolution.y) return;
+            
             var radiusInt = Mathf.CeilToInt(penSize);
             var left = Mathf.Max(0, posX - radiusInt);
             var right = Mathf.Min(resolution.x, posX + radiusInt + 1);
@@ -216,12 +229,19 @@ namespace UniPaint
             var leftBottomPosition = GetOrigin() - new Vector3(halfSize.x, halfSize.y);
             var mouseWorldPosition = m_Camera.ScreenToWorldPoint(mousePosition);
             var worldPosition = mouseWorldPosition - leftBottomPosition;
-            var tX = Mathf.InverseLerp(0f, totalSize.x, worldPosition.x);
-            var tY = Mathf.InverseLerp(0f, totalSize.y, worldPosition.y);
+            var tX = InverseLerpUnclamped(0f, totalSize.x, worldPosition.x);
+            var tY = InverseLerpUnclamped(0f, totalSize.y, worldPosition.y);
             return new Vector2(tX * resolution.x, tY * resolution.y);
         }
-        
 
+
+        private static float InverseLerpUnclamped(float a, float b, float value)
+        {
+            return (double) a != (double) b 
+                ? (float) (((double) value - (double) a) / ((double) b - (double) a)) 
+                : 0.0f;
+        }
+        
         private static Material GetDefaultMaterial()
         {
             return Resources.Load<Material>("Default-UniPaint-Material");

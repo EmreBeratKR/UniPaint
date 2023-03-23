@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace UniPaint
 {
@@ -11,13 +12,15 @@ namespace UniPaint
 
 
         private delegate void ToolMethod(Vector2 position);
-
+        
         
         [SerializeField, Min(1f)] private Vector2Int resolution = new Vector2Int(256, 256);
         [SerializeField, Min(0f)] private float size = 5f;
-        [SerializeField, Min(0f)] private float penSize = 10f;
+        [SerializeField, Min(0f)] private float maxToolSize = 25f;
+        [SerializeField, Min(0f)] private float minToolSize = 1f;
+        [SerializeField, Range(0f, 1f)] private float defaultToolSize = 0.2f;
 
-        
+
         private Color[] m_TextureColors;
         private Vector3 m_PreviousFrameMousePosition;
         private ColorWheelUI m_ColorWheel;
@@ -28,6 +31,7 @@ namespace UniPaint
         private MeshFilter m_MeshFilter;
         private Mesh m_CanvasMesh;
         private Camera m_Camera;
+        private float m_ToolSize;
         private int m_Width;
         private int m_Height;
         private bool m_IsDirty;
@@ -53,6 +57,52 @@ namespace UniPaint
             TryApplyChanges();
         }
 
+
+        public void Clear()
+        {
+            for (var i = 0; i < m_TextureColors.Length; i++)
+            {
+                SetPixelColorAtIndex(i, Color.clear);
+            }
+            
+            SetDirty();
+        }
+        
+        public void SetToolSize(float sizeNormalized)
+        {
+            m_ToolSize = Mathf.Lerp(minToolSize, maxToolSize, sizeNormalized);
+        }
+
+        public void SetToolSizeToDefault()
+        {
+            SetToolSize(defaultToolSize);
+        }
+
+        public float GetDefaultToolSize()
+        {
+            return defaultToolSize;
+        }
+
+        public void SetToolCirclePen()
+        {
+            m_SelectedTool = CircleDrawTool;
+        }
+        
+        public void SetToolCircleEraser()
+        {
+            m_SelectedTool = CircleEraseTool;
+        }
+        
+        public void SetToolSquarePen()
+        {
+            m_SelectedTool = SquareDrawTool;
+        }
+        
+        public void SetToolSquareEraser()
+        {
+            m_SelectedTool = SquareEraseTool;
+        }
+        
 
         private bool TryApplyChanges()
         {
@@ -118,7 +168,7 @@ namespace UniPaint
             
             ApplyChanges();
         }
-        
+
         private float GetAspectRatio()
         {
             return (float) m_Width / m_Height;
@@ -173,7 +223,7 @@ namespace UniPaint
             var mousePosition = Input.mousePosition;
             var deltaDistance = (mousePosition - m_PreviousFrameMousePosition).magnitude;
 
-            for (var i = 0f; i <= deltaDistance; i += penSize * 1f)
+            for (var i = 0f; i <= deltaDistance; i += m_ToolSize * 1f)
             {
                 var t = Mathf.InverseLerp(0, deltaDistance, i);
                 var lerpPosition = Vector3.Lerp(mousePosition, m_PreviousFrameMousePosition, t);
@@ -193,7 +243,7 @@ namespace UniPaint
             
             if (posY < 0 || posY >= m_Height) return;
             
-            var radiusInt = Mathf.CeilToInt(penSize);
+            var radiusInt = Mathf.CeilToInt(m_ToolSize);
             var left = Mathf.Max(0, posX - radiusInt);
             var right = Mathf.Min(m_Width, posX + radiusInt + 1);
             var bottom = Mathf.Max(0, posY - radiusInt);
@@ -219,12 +269,12 @@ namespace UniPaint
             
             if (posY < 0 || posY >= m_Height) return;
             
-            var radiusInt = Mathf.CeilToInt(penSize);
+            var radiusInt = Mathf.CeilToInt(m_ToolSize);
             var left = Mathf.Max(0, posX - radiusInt);
             var right = Mathf.Min(m_Width, posX + radiusInt + 1);
             var bottom = Mathf.Max(0, posY - radiusInt);
             var top = Mathf.Min(m_Height, posY + radiusInt + 1);
-            var sqrPenSize = penSize * penSize;
+            var sqrPenSize = m_ToolSize * m_ToolSize;
             
             for (int x = left; x < right; x++)
             {
@@ -293,6 +343,11 @@ namespace UniPaint
         private void SetPixelColor(int x, int y, Color color)
         {
             var index = GetPixelIndex(x, y);
+            SetPixelColorAtIndex(index, color);
+        }
+
+        private void SetPixelColorAtIndex(int index, Color color)
+        {
             m_TextureColors[index] = color;
         }
         

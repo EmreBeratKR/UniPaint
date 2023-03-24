@@ -26,8 +26,9 @@ namespace UniPaint
 
 
         private readonly HashSet<int> m_FloodFillBuffer = new HashSet<int>();
-        
-        
+        private readonly Stack<(int, int)> m_FloodFillCallStack = new Stack<(int, int)>();
+
+
         private Color m_FloodFillStartColor;
         private Color[] m_TextureColors;
         private Vector3 m_PreviousFrameMousePosition;
@@ -332,8 +333,6 @@ namespace UniPaint
 
         private void ColorBucketTool(Vector2Int position)
         {
-            m_FloodFillBuffer.Clear();
-            m_FloodFillStartColor = m_TextureColors[GetPixelIndex(position.x, position.y)];
             FloodFill(position.x, position.y);
 
             var color = GetSelectedColor();
@@ -405,38 +404,67 @@ namespace UniPaint
 
         private void FloodFill(int x, int y)
         {
-            var index = GetPixelIndex(x, y);
+            m_FloodFillBuffer.Clear();
+            m_FloodFillCallStack.Clear();
+            m_FloodFillStartColor = m_TextureColors[GetPixelIndex(x, y)];
+            m_FloodFillCallStack.Push((x, y));
 
-            if (m_FloodFillBuffer.Contains(index)) return;
-            
-            var color = m_TextureColors[index];
-            
-            if (!EqualColors(m_FloodFillStartColor, color)) return;
-            
-            m_FloodFillBuffer.Add(index);
-
-            var right = x + 1;
-            if (right < m_Width)
+            while (true)
             {
-                FloodFill(right, y);
-            }
+                if (!m_FloodFillCallStack.TryPop(out var pixel)) break;
 
-            var left = x - 1;
-            if (left >= 0)
-            {
-                FloodFill(left, y);
-            }
+                x = pixel.Item1;
+                y = pixel.Item2;
+                
+                m_FloodFillBuffer.Add(GetPixelIndex(x, y));
 
-            var top = y + 1;
-            if (top < m_Height)
-            {
-                FloodFill(x, top);
-            }
+                var right = x + 1;
+                if (right < m_Width)
+                {
+                    var index = GetPixelIndex(right, y);
+                    var color = m_TextureColors[index];
 
-            var bottom = y - 1;
-            if (bottom >= 0)
-            {
-                FloodFill(x, bottom);
+                    if (EqualColors(color, m_FloodFillStartColor) && !m_FloodFillBuffer.Contains(index))
+                    {
+                        m_FloodFillCallStack.Push((right, y));
+                    }
+                }
+                
+                var top = y + 1;
+                if (top < m_Height)
+                {
+                    var index = GetPixelIndex(x, top);
+                    var color = m_TextureColors[index];
+
+                    if (EqualColors(color, m_FloodFillStartColor) && !m_FloodFillBuffer.Contains(index))
+                    {
+                        m_FloodFillCallStack.Push((x, top));
+                    }
+                }
+                
+                var left = x - 1;
+                if (left >= 0)
+                {
+                    var index = GetPixelIndex(left, y);
+                    var color = m_TextureColors[index];
+
+                    if (EqualColors(color, m_FloodFillStartColor) && !m_FloodFillBuffer.Contains(index))
+                    {
+                        m_FloodFillCallStack.Push((left, y));
+                    }
+                }
+                
+                var bottom = y - 1;
+                if (bottom >= 0)
+                {
+                    var index = GetPixelIndex(x, bottom);
+                    var color = m_TextureColors[index];
+
+                    if (EqualColors(color, m_FloodFillStartColor) && !m_FloodFillBuffer.Contains(index))
+                    {
+                        m_FloodFillCallStack.Push((x, bottom));
+                    }
+                }
             }
         }
 
@@ -445,13 +473,13 @@ namespace UniPaint
         {
             const float tolerance = 0.0001f;
             
-            if (Math.Abs(lhs.r - rhs.r) > tolerance) return false;
+            if (Mathf.Abs(lhs.r - rhs.r) > tolerance) return false;
             
-            if (Math.Abs(lhs.g - rhs.g) > tolerance) return false;
+            if (Mathf.Abs(lhs.g - rhs.g) > tolerance) return false;
             
-            if (Math.Abs(lhs.b - rhs.b) > tolerance) return false;
+            if (Mathf.Abs(lhs.b - rhs.b) > tolerance) return false;
             
-            if (Math.Abs(lhs.a - rhs.a) > tolerance) return false;
+            if (Mathf.Abs(lhs.a - rhs.a) > tolerance) return false;
 
             return true;
         }

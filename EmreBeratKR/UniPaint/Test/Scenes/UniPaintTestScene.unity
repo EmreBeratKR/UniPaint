@@ -1358,7 +1358,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6f55c901e444765a28e9f04fe137517, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: {x: 1280, y: 720}
+  resolution: {x: 960, y: 540}
   size: 5
   maxToolSize: 25
   minToolSize: 1

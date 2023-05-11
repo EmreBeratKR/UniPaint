@@ -141,17 +141,22 @@ namespace UniPaint
 
         private Vector2 GetImageSize()
         {
-            return image.rectTransform.sizeDelta;
+            return image.rectTransform.sizeDelta * GetCanvasScaleFactor();
         }
 
         private Vector2 GetSelectorSize()
         {
-            return selector.rectTransform.sizeDelta;
+            return selector.rectTransform.sizeDelta * GetCanvasScaleFactor();
         }
 
         private Vector2 ScreenPointToLocalPosition(Vector2 screenPoint)
         {
             return screenPoint - GetImagePosition();
+        }
+
+        private float GetCanvasScaleFactor()
+        {
+            return image.canvas.scaleFactor;
         }
     }
 }

@@ -127,7 +127,12 @@ namespace UniPaint
 
         private Vector2 GetImageSize()
         {
-            return image.rectTransform.sizeDelta;
+            return image.rectTransform.sizeDelta * GetCanvasScaleFactor();
+        }
+
+        private float GetCanvasScaleFactor()
+        {
+            return image.canvas.scaleFactor;
         }
     }
 }
